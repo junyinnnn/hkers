@@ -3,7 +3,6 @@
 package config
 
 import (
-	"errors"
 	"log"
 	"os"
 	"strconv"
@@ -127,22 +126,6 @@ func Load() (*Config, error) {
 	}
 	endSessionURL := strings.TrimSpace(os.Getenv("OIDC_END_SESSION_URL"))
 	postLogoutRedirect := strings.TrimSpace(os.Getenv("OIDC_POST_LOGOUT_REDIRECT_URL"))
-
-	// Validate OIDC configuration if any OIDC env var is set (authentication required)
-	if oidcIssuer != "" || oidcClientID != "" || oidcClientSecret != "" || oidcRedirectURL != "" {
-		if oidcIssuer == "" {
-			return nil, errors.New("OIDC_ISSUER is required when using OIDC authentication. If not using OIDC, leave all OIDC_* variables unset")
-		}
-		if oidcClientID == "" {
-			return nil, errors.New("OIDC_CLIENT_ID is required when using OIDC authentication. If not using OIDC, leave all OIDC_* variables unset")
-		}
-		if oidcClientSecret == "" {
-			return nil, errors.New("OIDC_CLIENT_SECRET is required when using OIDC authentication. If not using OIDC, leave all OIDC_* variables unset")
-		}
-		if oidcRedirectURL == "" {
-			return nil, errors.New("OIDC_REDIRECT_URL is required when using OIDC authentication. If not using OIDC, leave all OIDC_* variables unset")
-		}
-	}
 
 	// CORS configuration
 	corsConfig := loadCORSConfig()
