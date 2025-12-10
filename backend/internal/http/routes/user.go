@@ -14,13 +14,6 @@ func RegisterUserRoutes(router *gin.Engine, svc *core.Container, jwtManager *cor
 	_ = svc // Will be used when user service is added
 	h := user.NewHandler()
 
-	// Protected routes - require JWT authentication
-	protected := router.Group("/")
-	protected.Use(middleware.JWTAuth(jwtManager))
-	{
-		protected.GET("/user", h.GetProfile)
-	}
-
 	// API routes - require JWT authentication
 	api := router.Group("/api/v1")
 	api.Use(middleware.JWTAuth(jwtManager))
