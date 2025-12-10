@@ -22,7 +22,14 @@ type Config struct {
 	Redis         RedisConfig
 	OIDC          OIDCConfig
 	CORS          CORSConfig
+	JWT           JWTConfig
 	SessionSecret string
+}
+
+// JWTConfig holds JWT token configuration.
+type JWTConfig struct {
+	Secret   string
+	Duration time.Duration
 }
 
 // DatabaseConfig holds database connection configuration.
@@ -199,6 +206,15 @@ func Load() (*Config, error) {
 		TLSInsecureSkipVerify: redisTLSInsecureSkipVerify,
 	}
 
+	// JWT configuration
+	jwtSecret := getEnv("JWT_SECRET", sessionSecret) // Use session secret as fallback
+	jwtDurationStr := getEnv("JWT_DURATION", "168h") // Default 7 days
+	jwtDuration, err := time.ParseDuration(jwtDurationStr)
+	if err != nil {
+		log.Printf("WARNING: Invalid JWT_DURATION '%s', using default 7 days", jwtDurationStr)
+		jwtDuration = 7 * 24 * time.Hour
+	}
+
 	return &Config{
 		Server: ServerConfig{
 			Host: getEnv("SERVER_HOST", "0.0.0.0"), // 0.0.0.0 allows access from outside container
@@ -215,7 +231,11 @@ func Load() (*Config, error) {
 			EndSessionURL:         endSessionURL,
 			PostLogoutRedirectURL: postLogoutRedirect,
 		},
-		CORS:          corsConfig,
+		CORS: corsConfig,
+		JWT: JWTConfig{
+			Secret:   jwtSecret,
+			Duration: jwtDuration,
+		},
 		SessionSecret: sessionSecret,
 	}, nil
 }
