@@ -3,6 +3,7 @@
 package config
 
 import (
+	"crypto/tls"
 	"log"
 	"os"
 	"strconv"
@@ -52,16 +53,29 @@ func (d *DatabaseConfig) GetConnString() string {
 
 // RedisConfig holds Redis connection configuration.
 type RedisConfig struct {
-	Host     string
-	Port     string
-	Username string
-	Password string
-	DB       int
+	Host                  string
+	Port                  string
+	Username              string
+	Password              string
+	DB                    int
+	TLSEnabled            bool
+	TLSInsecureSkipVerify bool
 }
 
 // GetAddr returns the Redis address in host:port format.
 func (r *RedisConfig) GetAddr() string {
 	return r.Host + ":" + r.Port
+}
+
+// GetTLSConfig returns a TLS configuration when TLS is enabled, otherwise nil.
+func (r *RedisConfig) GetTLSConfig() *tls.Config {
+	if !r.TLSEnabled {
+		return nil
+	}
+
+	return &tls.Config{
+		InsecureSkipVerify: r.TLSInsecureSkipVerify,
+	}
 }
 
 // ServerConfig holds server-related configuration.
@@ -143,12 +157,16 @@ func Load() (*Config, error) {
 
 	// Redis configuration
 	redisDB, _ := strconv.Atoi(getEnv("REDIS_DB", "0"))
+	redisTLSEnabled := strings.EqualFold(getEnv("REDIS_TLS_ENABLED", "false"), "true")
+	redisTLSInsecureSkipVerify := strings.EqualFold(getEnv("REDIS_TLS_INSECURE_SKIP_VERIFY", "false"), "true")
 	redisConfig := RedisConfig{
-		Host:     getEnv("REDIS_HOST", "localhost"),
-		Port:     getEnv("REDIS_PORT", "6379"),
-		Username: getEnv("REDIS_USERNAME", ""),
-		Password: getEnv("REDIS_PASSWORD", ""),
-		DB:       redisDB,
+		Host:                  getEnv("REDIS_HOST", "localhost"),
+		Port:                  getEnv("REDIS_PORT", "6379"),
+		Username:              getEnv("REDIS_USERNAME", ""),
+		Password:              getEnv("REDIS_PASSWORD", ""),
+		DB:                    redisDB,
+		TLSEnabled:            redisTLSEnabled,
+		TLSInsecureSkipVerify: redisTLSInsecureSkipVerify,
 	}
 
 	return &Config{
