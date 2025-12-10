@@ -3,6 +3,7 @@
 package config
 
 import (
+	"crypto/tls"
 	"log"
 	"os"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gin-contrib/cors"
+	redigo "github.com/gomodule/redigo/redis"
 	"github.com/joho/godotenv"
 )
 
@@ -20,7 +22,14 @@ type Config struct {
 	Redis         RedisConfig
 	OIDC          OIDCConfig
 	CORS          CORSConfig
+	JWT           JWTConfig
 	SessionSecret string
+}
+
+// JWTConfig holds JWT token configuration.
+type JWTConfig struct {
+	Secret   string
+	Duration time.Duration
 }
 
 // DatabaseConfig holds database connection configuration.
@@ -52,15 +61,58 @@ func (d *DatabaseConfig) GetConnString() string {
 
 // RedisConfig holds Redis connection configuration.
 type RedisConfig struct {
-	Host     string
-	Port     string
-	Password string
-	DB       int
+	Host                  string
+	Port                  string
+	Username              string
+	Password              string
+	DB                    int
+	TLSEnabled            bool
+	TLSInsecureSkipVerify bool
 }
 
 // GetAddr returns the Redis address in host:port format.
 func (r *RedisConfig) GetAddr() string {
 	return r.Host + ":" + r.Port
+}
+
+// GetTLSConfig returns a TLS configuration when TLS is enabled, otherwise nil.
+func (r *RedisConfig) GetTLSConfig() *tls.Config {
+	if !r.TLSEnabled {
+		return nil
+	}
+
+	return &tls.Config{
+		InsecureSkipVerify: r.TLSInsecureSkipVerify,
+	}
+}
+
+// NewRedisPool creates a redigo connection pool with TLS support if enabled.
+func (r *RedisConfig) NewRedisPool() *redigo.Pool {
+	return &redigo.Pool{
+		MaxIdle:     10,
+		IdleTimeout: 240 * time.Second,
+		Dial: func() (redigo.Conn, error) {
+			opts := []redigo.DialOption{
+				redigo.DialPassword(r.Password),
+			}
+
+			if r.TLSEnabled {
+				opts = append(opts,
+					redigo.DialTLSConfig(r.GetTLSConfig()),
+					redigo.DialUseTLS(true),
+				)
+			}
+
+			return redigo.Dial("tcp", r.GetAddr(), opts...)
+		},
+		TestOnBorrow: func(c redigo.Conn, t time.Time) error {
+			if time.Since(t) < time.Minute {
+				return nil
+			}
+			_, err := c.Do("PING")
+			return err
+		},
+	}
 }
 
 // ServerConfig holds server-related configuration.
@@ -142,11 +194,25 @@ func Load() (*Config, error) {
 
 	// Redis configuration
 	redisDB, _ := strconv.Atoi(getEnv("REDIS_DB", "0"))
+	redisTLSEnabled := strings.EqualFold(getEnv("REDIS_TLS_ENABLED", "false"), "true")
+	redisTLSInsecureSkipVerify := strings.EqualFold(getEnv("REDIS_TLS_INSECURE_SKIP_VERIFY", "false"), "true")
 	redisConfig := RedisConfig{
-		Host:     getEnv("REDIS_HOST", "localhost"),
-		Port:     getEnv("REDIS_PORT", "6379"),
-		Password: getEnv("REDIS_PASSWORD", ""),
-		DB:       redisDB,
+		Host:                  getEnv("REDIS_HOST", "localhost"),
+		Port:                  getEnv("REDIS_PORT", "6379"),
+		Username:              getEnv("REDIS_USERNAME", ""),
+		Password:              getEnv("REDIS_PASSWORD", ""),
+		DB:                    redisDB,
+		TLSEnabled:            redisTLSEnabled,
+		TLSInsecureSkipVerify: redisTLSInsecureSkipVerify,
+	}
+
+	// JWT configuration
+	jwtSecret := getEnv("JWT_SECRET", sessionSecret) // Use session secret as fallback
+	jwtDurationStr := getEnv("JWT_DURATION", "168h") // Default 7 days
+	jwtDuration, err := time.ParseDuration(jwtDurationStr)
+	if err != nil {
+		log.Printf("WARNING: Invalid JWT_DURATION '%s', using default 7 days", jwtDurationStr)
+		jwtDuration = 7 * 24 * time.Hour
 	}
 
 	return &Config{
@@ -165,7 +231,11 @@ func Load() (*Config, error) {
 			EndSessionURL:         endSessionURL,
 			PostLogoutRedirectURL: postLogoutRedirect,
 		},
-		CORS:          corsConfig,
+		CORS: corsConfig,
+		JWT: JWTConfig{
+			Secret:   jwtSecret,
+			Duration: jwtDuration,
+		},
 		SessionSecret: sessionSecret,
 	}, nil
 }

@@ -34,8 +34,10 @@ func initDB(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
 func initRedis(ctx context.Context, cfg *config.Config) (*redis.Client, error) {
 	opts := &redis.Options{
 		Addr:     cfg.Redis.GetAddr(),
+		Username: cfg.Redis.Username,
 		Password: cfg.Redis.Password,
 		DB:       cfg.Redis.DB,
+		TLSConfig: cfg.Redis.GetTLSConfig(),
 	}
 
 	log.Printf("Connecting to Redis at %s", opts.Addr)
