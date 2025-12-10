@@ -3,9 +3,9 @@ package user
 import (
 	"net/http"
 
-	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 
+	"hkers-backend/internal/http/middleware"
 	"hkers-backend/internal/http/response"
 )
 
@@ -21,15 +21,22 @@ func NewHandler() *Handler {
 }
 
 // GetProfile returns the authenticated user's profile.
-// GET /user
+// GET /user or GET /api/v1/me
+// Note: JWT middleware has already validated the token and extracted claims
 func (h *Handler) GetProfile(ctx *gin.Context) {
-	session := sessions.Default(ctx)
-	profile := session.Get("profile")
+	// Get user info from JWT claims (set by JWT middleware)
+	userID, _ := middleware.GetUserIDFromContext(ctx)
+	email, _ := middleware.GetEmailFromContext(ctx)
+	username, _ := middleware.GetUsernameFromContext(ctx)
+	oidcSub, _ := ctx.Get("oidc_sub")
+	isActive, _ := ctx.Get("is_active")
 
-	if profile == nil {
-		response.Error(ctx, http.StatusUnauthorized, "User not authenticated")
-		return
-	}
-
-	response.Success(ctx, http.StatusOK, profile)
+	// Return user profile from JWT claims
+	response.Success(ctx, http.StatusOK, gin.H{
+		"id":        userID,
+		"email":     email,
+		"username":  username,
+		"oidc_sub":  oidcSub,
+		"is_active": isActive,
+	})
 }
