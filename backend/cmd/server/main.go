@@ -25,8 +25,14 @@ func main() {
 		gin.SetMode(mode)
 	}
 
+	// Load configuration
+	cfg, err := Load()
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
+	}
+
 	// Bootstrap all application components
-	bootstrap, err := app.Bootstrap()
+	bootstrap, err := app.Bootstrap(cfg.SessionSecret)
 	if err != nil {
 		log.Fatalf("Failed to bootstrap application: %v", err)
 	}
@@ -34,7 +40,7 @@ func main() {
 	defer bootstrap.Redis.Close()
 
 	// Start server
-	addr := bootstrap.Config.Server.Host + ":" + bootstrap.Config.Server.Port
+	addr := cfg.Server.Host + ":" + cfg.Server.Port
 	log.Printf("Server listening on http://%s/", addr)
 	if err := http.ListenAndServe(addr, bootstrap.Router); err != nil {
 		log.Fatalf("Failed to start server: %v", err)

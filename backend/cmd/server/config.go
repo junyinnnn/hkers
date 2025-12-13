@@ -1,6 +1,6 @@
 // config/config.go
 
-package config
+package main
 
 import (
 	"log"

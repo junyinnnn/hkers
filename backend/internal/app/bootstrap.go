@@ -8,7 +8,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 
-	"hkers-backend/config"
 	"hkers-backend/internal/auth"
 	service "hkers-backend/internal/core/service"
 	"hkers-backend/internal/database"
@@ -18,7 +17,6 @@ import (
 
 // BootstrapResult contains all initialized components needed to run the server
 type BootstrapResult struct {
-	Config   *config.Config
 	Database *pgxpool.Pool
 	Redis    *redis.Client
 	Service  *service.Container
@@ -26,12 +24,7 @@ type BootstrapResult struct {
 }
 
 // Bootstrap initializes all application components
-func Bootstrap() (*BootstrapResult, error) {
-	// Load configuration
-	cfg, err := config.Load()
-	if err != nil {
-		return nil, err
-	}
+func Bootstrap(sessionSecret string) (*BootstrapResult, error) {
 
 	ctx := context.Background()
 
@@ -67,7 +60,7 @@ func Bootstrap() (*BootstrapResult, error) {
 	svc := service.NewContainer(authService, userService)
 
 	// Setup router
-	router, err := NewRouter(cfg.SessionSecret, svc)
+	router, err := NewRouter(sessionSecret, svc)
 	if err != nil {
 		pool.Close()
 		redisClient.Close()
@@ -75,7 +68,6 @@ func Bootstrap() (*BootstrapResult, error) {
 	}
 
 	return &BootstrapResult{
-		Config:   cfg,
 		Database: pool,
 		Redis:    redisClient,
 		Service:  svc,
