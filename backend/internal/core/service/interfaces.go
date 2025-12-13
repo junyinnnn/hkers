@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/gin-gonic/gin"
 	"golang.org/x/oauth2"
 
 	db "hkers-backend/internal/db/generated"
@@ -25,4 +26,17 @@ type AuthServiceInterface interface {
 type UserServiceInterface interface {
 	ValidateOIDCLogin(ctx context.Context, oidcSub string) (*db.User, error)
 	GetOrCreateOIDCUser(ctx context.Context, oidcSub, nickname, email string) (*db.User, bool, error)
+}
+
+// AuthHandlerInterface defines the interface for authentication HTTP handlers
+type AuthHandlerInterface interface {
+	Login(ctx *gin.Context)
+	Callback(ctx *gin.Context)
+	Logout(ctx *gin.Context)
+	RefreshToken(ctx *gin.Context)
+}
+
+// UserHandlerInterface defines the interface for user HTTP handlers
+type UserHandlerInterface interface {
+	GetProfile(ctx *gin.Context)
 }
