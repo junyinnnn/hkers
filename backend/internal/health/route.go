@@ -2,7 +2,7 @@ package routes
 
 import (
 	"github.com/gin-gonic/gin"
-	"hkers-backend/internal/http/handlers/health"
+	"hkers-backend/internal/health"
 )
 
 // RegisterHealthRoutes registers base/public routes on the given router.

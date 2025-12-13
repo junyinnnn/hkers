@@ -5,8 +5,8 @@ import (
 
 	"hkers-backend/internal/core"
 	coreauth "hkers-backend/internal/core/auth"
-	"hkers-backend/internal/http/handlers/user"
-	"hkers-backend/internal/http/middleware"
+	"hkers-backend/internal/middleware"
+	"hkers-backend/internal/user"
 )
 
 // RegisterUserRoutes registers user routes on the given router.

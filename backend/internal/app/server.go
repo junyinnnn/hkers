@@ -11,9 +11,11 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"hkers-backend/config"
+	"hkers-backend/internal/auth"
 	"hkers-backend/internal/core"
 	coreauth "hkers-backend/internal/core/auth"
-	"hkers-backend/internal/http/routes"
+	"hkers-backend/internal/health"
+	"hkers-backend/internal/user"
 )
 
 // NewRouter configures the Gin engine with middleware and route groups.
@@ -42,9 +44,9 @@ func NewRouter(cfg *config.Config, svc *core.Container) (*gin.Engine, error) {
 	jwtManager := coreauth.NewJWTManager(cfg.JWT.Secret, cfg.JWT.Duration)
 
 	// Register route groups
-	routes.RegisterHealthRoutes(router)
-	routes.RegisterAuthRoutes(router, svc, jwtManager)
-	routes.RegisterUserRoutes(router, svc, jwtManager)
+	health.RegisterHealthRoutes(router)
+	auth.RegisterAuthRoutes(router, svc, jwtManager)
+	user.RegisterUserRoutes(router, svc, jwtManager)
 
 	return router, nil
 }

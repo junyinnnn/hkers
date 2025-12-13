@@ -5,8 +5,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"hkers-backend/internal/http/middleware"
-	"hkers-backend/internal/http/response"
+	"hkers-backend/internal/core"
+	"hkers-backend/internal/middleware"
 )
 
 // Handler handles user-related HTTP requests.
@@ -32,7 +32,7 @@ func (h *Handler) GetProfile(ctx *gin.Context) {
 	isActive, _ := ctx.Get("is_active")
 
 	// Return user profile from JWT claims
-	response.Success(ctx, http.StatusOK, gin.H{
+	core.Success(ctx, http.StatusOK, gin.H{
 		"id":        userID,
 		"email":     email,
 		"username":  username,
