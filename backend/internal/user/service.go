@@ -7,7 +7,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	db "hkers-backend/internal/db/generated"
+	db "hkers-backend/internal/sqlc/generated"
 )
 
 var (

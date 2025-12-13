@@ -9,7 +9,7 @@ import (
 
 	"hkers-backend/internal/core/response"
 	service "hkers-backend/internal/core/service"
-	db "hkers-backend/internal/db/generated"
+	db "hkers-backend/internal/sqlc/generated"
 	"hkers-backend/internal/user"
 )
 

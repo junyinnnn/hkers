@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"golang.org/x/oauth2"
 
-	db "hkers-backend/internal/db/generated"
+	db "hkers-backend/internal/sqlc/generated"
 )
 
 // AuthServiceInterface defines the interface for authentication services
