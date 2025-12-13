@@ -1,7 +1,11 @@
 package database
 
 import (
+	"context"
+	"log"
 	"os"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Config holds database connection configuration.
@@ -41,6 +45,26 @@ func (d *Config) GetConnString() string {
 	return "postgres://" + d.User + ":" + d.Password +
 		"@" + d.Host + ":" + d.Port +
 		"/" + d.Name + "?sslmode=" + d.SSLMode
+}
+
+// InitDB creates and verifies a pgx pool based on configuration.
+func InitDB(ctx context.Context) (*pgxpool.Pool, error) {
+	config := LoadConfig()
+	log.Printf("Connecting to database at %s:%s", config.Host, config.Port)
+
+	pool, err := pgxpool.New(ctx, config.GetConnString())
+	if err != nil {
+		return nil, err
+	}
+
+	// Verify connectivity early
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
+		return nil, err
+	}
+
+	log.Printf("Database connection established successfully")
+	return pool, nil
 }
 
 // getEnv returns the value of an environment variable or a default value.

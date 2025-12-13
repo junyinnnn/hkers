@@ -1,12 +1,15 @@
 package redis
 
 import (
+	"context"
 	"crypto/tls"
+	"log"
 	"os"
 	"strconv"
 	"time"
 
 	redigo "github.com/gomodule/redigo/redis"
+	"github.com/redis/go-redis/v9"
 )
 
 // Config holds Redis connection configuration.
@@ -80,6 +83,29 @@ func (r *Config) NewRedisPool() *redigo.Pool {
 			return err
 		},
 	}
+}
+
+// InitRedis creates a Redis client and verifies connectivity with a PING.
+func InitRedis(ctx context.Context) (*redis.Client, error) {
+	config := LoadConfig()
+	opts := &redis.Options{
+		Addr:       config.GetAddr(),
+		Username:   config.Username,
+		Password:   config.Password,
+		DB:         config.DB,
+		TLSConfig: config.GetTLSConfig(),
+	}
+
+	log.Printf("Connecting to Redis at %s", opts.Addr)
+	client := redis.NewClient(opts)
+
+	if err := client.Ping(ctx).Err(); err != nil {
+		client.Close()
+		return nil, err
+	}
+
+	log.Printf("Redis connection established successfully")
+	return client, nil
 }
 
 // getEnv returns the value of an environment variable or a default value.
