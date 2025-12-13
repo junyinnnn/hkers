@@ -9,7 +9,7 @@ import (
 
 // RegisterAuthRoutes registers auth routes on the given router.
 func RegisterAuthRoutes(router *gin.Engine, svc *service.Container, jwtManager response.JWTManager) {
-	h := NewHandler(svc.Auth, svc.User, jwtManager)
+	var h service.AuthHandlerInterface = NewHandler(svc.Auth, svc.User, jwtManager)
 
 	// Auth routes under /auth
 	auth := router.Group("/auth")

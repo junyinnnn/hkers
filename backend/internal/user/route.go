@@ -11,7 +11,7 @@ import (
 // RegisterUserRoutes registers user routes on the given router.
 func RegisterUserRoutes(router *gin.Engine, svc *service.Container, jwtManager response.JWTManager) {
 	_ = svc // Will be used when user service is added
-	h := NewHandler()
+	var h service.UserHandlerInterface = NewHandler()
 
 	// API routes - require JWT authentication
 	api := router.Group("/api/v1")

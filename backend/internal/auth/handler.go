@@ -21,7 +21,7 @@ type Handler struct {
 }
 
 // NewHandler creates a new auth Handler instance.
-func NewHandler(authService service.AuthServiceInterface, userService service.UserServiceInterface, jwtManager response.JWTManager) *Handler {
+func NewHandler(authService service.AuthServiceInterface, userService service.UserServiceInterface, jwtManager response.JWTManager) service.AuthHandlerInterface {
 	return &Handler{
 		authService: authService,
 		userService: userService,
