@@ -1,16 +1,14 @@
-package routes
+package auth
 
 import (
 	"github.com/gin-gonic/gin"
 
-	"hkers-backend/internal/auth"
-	"hkers-backend/internal/core"
-	coreauth "hkers-backend/internal/core/auth"
+	response "hkers-backend/internal/core"
 )
 
 // RegisterAuthRoutes registers auth routes on the given router.
-func RegisterAuthRoutes(router *gin.Engine, svc *core.Container, jwtManager *coreauth.JWTManager) {
-	h := auth.NewHandler(svc.Auth, svc.User, jwtManager)
+func RegisterAuthRoutes(router *gin.Engine, svc *response.Container, jwtManager response.JWTManager) {
+	h := NewHandler(svc.Auth, svc.User, jwtManager)
 
 	// Auth routes under /auth
 	auth := router.Group("/auth")

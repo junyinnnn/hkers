@@ -12,14 +12,13 @@ import (
 
 	"hkers-backend/config"
 	"hkers-backend/internal/auth"
-	"hkers-backend/internal/core"
-	coreauth "hkers-backend/internal/core/auth"
+	response "hkers-backend/internal/core"
 	"hkers-backend/internal/health"
 	"hkers-backend/internal/user"
 )
 
 // NewRouter configures the Gin engine with middleware and route groups.
-func NewRouter(cfg *config.Config, svc *core.Container) (*gin.Engine, error) {
+func NewRouter(cfg *config.Config, svc *response.Container) (*gin.Engine, error) {
 	router := gin.Default()
 
 	// CORS middleware
@@ -41,7 +40,7 @@ func NewRouter(cfg *config.Config, svc *core.Container) (*gin.Engine, error) {
 	router.Use(sessions.Sessions("auth-session", store))
 
 	// Create JWT manager for token-based authentication
-	jwtManager := coreauth.NewJWTManager(cfg.JWT.Secret, cfg.JWT.Duration)
+	jwtManager := auth.NewJWTManager(cfg.JWT.Secret, cfg.JWT.Duration)
 
 	// Register route groups
 	health.RegisterHealthRoutes(router)

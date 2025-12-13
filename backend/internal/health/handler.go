@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"hkers-backend/internal/core"
+	response "hkers-backend/internal/core"
 )
 
 // Handler returns the health status of the API.
@@ -15,7 +15,7 @@ func Handler(ctx *gin.Context) {
 		return
 	}
 
-	core.Success(ctx, http.StatusOK, gin.H{
+	response.Success(ctx, http.StatusOK, gin.H{
 		"status":  "healthy",
 		"message": "HKERS API Server",
 	})

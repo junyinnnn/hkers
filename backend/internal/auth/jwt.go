@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+
+	response "hkers-backend/internal/core"
 )
 
 var (
@@ -15,15 +17,8 @@ var (
 	ErrExpiredToken = errors.New("token has expired")
 )
 
-// JWTClaims represents the claims in our JWT token
-type JWTClaims struct {
-	UserID   int32  `json:"user_id"`   // Database user ID
-	Email    string `json:"email"`     // User email
-	OIDCSub  string `json:"oidc_sub"`  // OIDC subject identifier
-	Username string `json:"username"`  // Username
-	IsActive bool   `json:"is_active"` // Account active status
-	jwt.RegisteredClaims
-}
+// JWTClaims is an alias to the core JWTClaims for backward compatibility
+type JWTClaims = response.JWTClaims
 
 // JWTManager handles JWT token generation and validation
 type JWTManager struct {

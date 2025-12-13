@@ -13,8 +13,9 @@ import (
 
 	"hkers-backend/config"
 	"hkers-backend/internal/app"
-	"hkers-backend/internal/core"
-	coreauth "hkers-backend/internal/core/auth"
+	"hkers-backend/internal/auth"
+	response "hkers-backend/internal/core"
+	"hkers-backend/internal/user"
 )
 
 func init() {
@@ -51,16 +52,19 @@ func main() {
 	defer redisClient.Close()
 
 	// Initialize services
-	var authService *coreauth.Service
+	var authService *auth.Service
 	log.Printf("Initializing OIDC service with issuer: %s", cfg.OIDC.Issuer)
-	authService, err = coreauth.NewService(&cfg.OIDC)
+	authService, err = auth.NewService(&cfg.OIDC)
 	if err != nil {
 		log.Fatalf("Failed to initialize auth service: %v", err)
 	}
 	log.Printf("OIDC service initialized successfully")
 
+	// Initialize user service
+	userService := user.NewService(pool)
+
 	// Create service container with database pool
-	svc := core.NewContainer(authService, pool)
+	svc := response.NewContainer(authService, userService)
 
 	// Setup router
 	router, err := app.NewRouter(cfg, svc)

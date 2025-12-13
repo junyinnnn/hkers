@@ -1,13 +1,12 @@
-package routes
+package health
 
 import (
 	"github.com/gin-gonic/gin"
-	"hkers-backend/internal/health"
 )
 
 // RegisterHealthRoutes registers base/public routes on the given router.
 func RegisterHealthRoutes(router *gin.Engine) {
-	router.GET("/", health.Handler)
-	router.GET("/health", health.Handler)
-	router.HEAD("/health", health.Handler)
+	router.GET("/", Handler)
+	router.GET("/health", Handler)
+	router.HEAD("/health", Handler)
 }

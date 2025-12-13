@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"hkers-backend/internal/core"
+	response "hkers-backend/internal/core"
 	"hkers-backend/internal/middleware"
 )
 
@@ -32,7 +32,7 @@ func (h *Handler) GetProfile(ctx *gin.Context) {
 	isActive, _ := ctx.Get("is_active")
 
 	// Return user profile from JWT claims
-	core.Success(ctx, http.StatusOK, gin.H{
+	response.Success(ctx, http.StatusOK, gin.H{
 		"id":        userID,
 		"email":     email,
 		"username":  username,

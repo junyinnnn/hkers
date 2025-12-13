@@ -7,21 +7,20 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 
-	coreauth "hkers-backend/internal/core/auth"
-	coreuser "hkers-backend/internal/core/user"
+	response "hkers-backend/internal/core"
 	db "hkers-backend/internal/db/generated"
-	"hkers-backend/internal/core"
+	"hkers-backend/internal/user"
 )
 
 // Handler handles authentication-related HTTP requests.
 type Handler struct {
-	authService *coreauth.Service
-	userService *coreuser.Service
-	jwtManager  *coreauth.JWTManager
+	authService response.AuthService
+	userService response.UserService
+	jwtManager  response.JWTManager
 }
 
 // NewHandler creates a new auth Handler instance.
-func NewHandler(authService *coreauth.Service, userService *coreuser.Service, jwtManager *coreauth.JWTManager) *Handler {
+func NewHandler(authService response.AuthService, userService response.UserService, jwtManager response.JWTManager) *Handler {
 	return &Handler{
 		authService: authService,
 		userService: userService,
@@ -33,19 +32,19 @@ func NewHandler(authService *coreauth.Service, userService *coreuser.Service, jw
 // GET /auth/login
 func (h *Handler) Login(ctx *gin.Context) {
 	if h.authService == nil {
-		core.Error(ctx, http.StatusServiceUnavailable, "OIDC authentication is not configured. Please configure OIDC_ISSUER, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, and OIDC_REDIRECT_URL environment variables.")
+		response.Error(ctx, http.StatusServiceUnavailable, "OIDC authentication is not configured. Please configure OIDC_ISSUER, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, and OIDC_REDIRECT_URL environment variables.")
 		return
 	}
 
 	state, err := h.authService.GenerateState()
 	if err != nil {
-		core.Error(ctx, http.StatusInternalServerError, "Failed to generate state")
+		response.Error(ctx, http.StatusInternalServerError, "Failed to generate state")
 		return
 	}
 
 	codeVerifier, codeChallenge, err := h.authService.GeneratePKCE()
 	if err != nil {
-		core.Error(ctx, http.StatusInternalServerError, "Failed to generate PKCE verifier")
+		response.Error(ctx, http.StatusInternalServerError, "Failed to generate PKCE verifier")
 		return
 	}
 
@@ -54,7 +53,7 @@ func (h *Handler) Login(ctx *gin.Context) {
 	session.Set("state", state)
 	session.Set("code_verifier", codeVerifier)
 	if err := session.Save(); err != nil {
-		core.Error(ctx, http.StatusInternalServerError, "Failed to save session")
+		response.Error(ctx, http.StatusInternalServerError, "Failed to save session")
 		return
 	}
 
@@ -66,7 +65,7 @@ func (h *Handler) Login(ctx *gin.Context) {
 // GET /auth/callback
 func (h *Handler) Callback(ctx *gin.Context) {
 	if h.authService == nil {
-		core.Error(ctx, http.StatusServiceUnavailable, "OIDC authentication is not configured. Please configure OIDC_ISSUER, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, and OIDC_REDIRECT_URL environment variables.")
+		response.Error(ctx, http.StatusServiceUnavailable, "OIDC authentication is not configured. Please configure OIDC_ISSUER, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, and OIDC_REDIRECT_URL environment variables.")
 		return
 	}
 
@@ -74,56 +73,56 @@ func (h *Handler) Callback(ctx *gin.Context) {
 
 	// Verify state parameter to prevent CSRF
 	if ctx.Query("state") != session.Get("state") {
-		core.Error(ctx, http.StatusBadRequest, "Invalid state parameter")
+		response.Error(ctx, http.StatusBadRequest, "Invalid state parameter")
 		return
 	}
 
 	verifier, ok := session.Get("code_verifier").(string)
 	if !ok || verifier == "" {
-		core.Error(ctx, http.StatusBadRequest, "Missing PKCE verifier")
+		response.Error(ctx, http.StatusBadRequest, "Missing PKCE verifier")
 		return
 	}
 
 	// Exchange authorization code for tokens
 	token, err := h.authService.ExchangeCodeWithPKCE(ctx.Request.Context(), ctx.Query("code"), verifier)
 	if err != nil {
-		core.Error(ctx, http.StatusUnauthorized, "Failed to exchange authorization code")
+		response.Error(ctx, http.StatusUnauthorized, "Failed to exchange authorization code")
 		return
 	}
 
 	// Verify the ID token
 	idToken, _, verifyErr := h.authService.VerifyIDToken(ctx.Request.Context(), token)
 	if verifyErr != nil {
-		core.Error(ctx, http.StatusInternalServerError, "Failed to verify ID token")
+		response.Error(ctx, http.StatusInternalServerError, "Failed to verify ID token")
 		return
 	}
 
 	// Extract user profile from claims
 	profile, profileErr := h.authService.ExtractClaims(idToken)
 	if profileErr != nil {
-		core.Error(ctx, http.StatusInternalServerError, "Failed to extract claims")
+		response.Error(ctx, http.StatusInternalServerError, "Failed to extract claims")
 		return
 	}
 
 	// Get subject identifier (unique user ID from the OIDC provider)
 	oidcSub, ok := profile["sub"].(string)
 	if !ok || oidcSub == "" {
-		core.Error(ctx, http.StatusInternalServerError, "Invalid OIDC token: missing sub claim")
+		response.Error(ctx, http.StatusInternalServerError, "Invalid OIDC token: missing sub claim")
 		return
 	}
 
 	// Check if user is allowed to login (must exist in database and be active)
-	var user *db.User
+	var dbUser *db.User
 	if h.userService != nil {
 		var validateErr error
-		user, validateErr = h.userService.ValidateOIDCLogin(ctx.Request.Context(), oidcSub)
+		dbUser, validateErr = h.userService.ValidateOIDCLogin(ctx.Request.Context(), oidcSub)
 		if validateErr != nil {
-			if errors.Is(validateErr, coreuser.ErrUserNotActive) {
+			if errors.Is(validateErr, user.ErrUserNotActive) {
 				// User exists but is not activated - pending approval
-				core.Error(ctx, http.StatusForbidden, "Your account is pending approval. Please contact an administrator.")
+				response.Error(ctx, http.StatusForbidden, "Your account is pending approval. Please contact an administrator.")
 				return
 			}
-			if errors.Is(validateErr, coreuser.ErrUserNotAllowed) {
+			if errors.Is(validateErr, user.ErrUserNotAllowed) {
 				// User doesn't exist in our system
 				// Option 1: Auto-create as inactive (requires admin approval)
 				email, _ := profile["email"].(string)
@@ -137,36 +136,36 @@ func (h *Handler) Callback(ctx *gin.Context) {
 
 				_, isNew, createErr := h.userService.GetOrCreateOIDCUser(ctx.Request.Context(), oidcSub, nickname, email)
 				if createErr != nil {
-					core.Error(ctx, http.StatusInternalServerError, "Failed to register user")
+					response.Error(ctx, http.StatusInternalServerError, "Failed to register user")
 					return
 				}
 
 				if isNew {
-					core.Error(ctx, http.StatusForbidden, "Your account has been registered and is pending approval. Please contact an administrator.")
+					response.Error(ctx, http.StatusForbidden, "Your account has been registered and is pending approval. Please contact an administrator.")
 				} else {
-					core.Error(ctx, http.StatusForbidden, "Your account is not active. Please contact an administrator.")
+					response.Error(ctx, http.StatusForbidden, "Your account is not active. Please contact an administrator.")
 				}
 				return
 			}
 			// Other database errors
-			core.Error(ctx, http.StatusInternalServerError, "Failed to validate user")
+			response.Error(ctx, http.StatusInternalServerError, "Failed to validate user")
 			return
 		}
 	} else {
-		core.Error(ctx, http.StatusInternalServerError, "User service not configured")
+		response.Error(ctx, http.StatusInternalServerError, "User service not configured")
 		return
 	}
 
 	// Generate JWT token for the authenticated user
 	jwtToken, jwtErr := h.jwtManager.GenerateToken(
-		user.ID,
-		user.Email.String,
-		user.OidcSub,
-		user.Username,
-		user.IsActive.Bool,
+		dbUser.ID,
+		dbUser.Email.String,
+		dbUser.OidcSub,
+		dbUser.Username,
+		dbUser.IsActive.Bool,
 	)
 	if jwtErr != nil {
-		core.Error(ctx, http.StatusInternalServerError, "Failed to generate access token")
+		response.Error(ctx, http.StatusInternalServerError, "Failed to generate access token")
 		return
 	}
 
@@ -174,23 +173,23 @@ func (h *Handler) Callback(ctx *gin.Context) {
 	session.Delete("state")
 	session.Delete("code_verifier")
 	if saveErr := session.Save(); saveErr != nil {
-		core.Error(ctx, http.StatusInternalServerError, "Failed to clear session")
+		response.Error(ctx, http.StatusInternalServerError, "Failed to clear session")
 		return
 	}
 
 	// Return JWT token and user info in response
-	core.Success(ctx, http.StatusOK, gin.H{
+	response.Success(ctx, http.StatusOK, gin.H{
 		"access_token": jwtToken,
 		"token_type":   "Bearer",
 		"expires_in":   86400 * 7, // 7 days in seconds
 		"user": gin.H{
-			"id":           user.ID,
-			"email":        user.Email.String,
-			"username":     user.Username,
-			"oidc_sub":     user.OidcSub,
-			"is_active":    user.IsActive,
-			"trust_points": user.TrustPoints,
-			"created_at":   user.CreatedAt,
+			"id":           dbUser.ID,
+			"email":        dbUser.Email.String,
+			"username":     dbUser.Username,
+			"oidc_sub":     dbUser.OidcSub,
+			"is_active":    dbUser.IsActive,
+			"trust_points": dbUser.TrustPoints,
+			"created_at":   dbUser.CreatedAt,
 		},
 	})
 }
@@ -203,7 +202,7 @@ func (h *Handler) Logout(ctx *gin.Context) {
 
 	// If OIDC is not configured, just return success
 	if h.authService == nil {
-		core.Success(ctx, http.StatusOK, gin.H{
+		response.Success(ctx, http.StatusOK, gin.H{
 			"message": "Logged out successfully",
 		})
 		return
@@ -223,17 +222,17 @@ func (h *Handler) Logout(ctx *gin.Context) {
 	// Note: We can't get id_token from session anymore, so OIDC logout might be limited
 	logoutURL, ok, err := h.authService.GetEndSessionURL(returnToURL, "")
 	if err != nil {
-		core.Error(ctx, http.StatusInternalServerError, "Failed to build logout URL")
+		response.Error(ctx, http.StatusInternalServerError, "Failed to build logout URL")
 		return
 	}
 
 	if ok {
-		core.Success(ctx, http.StatusOK, gin.H{
+		response.Success(ctx, http.StatusOK, gin.H{
 			"message":    "Logged out successfully",
 			"logout_url": logoutURL,
 		})
 	} else {
-		core.Success(ctx, http.StatusOK, gin.H{
+		response.Success(ctx, http.StatusOK, gin.H{
 			"message": "Logged out successfully",
 		})
 	}
@@ -245,14 +244,14 @@ func (h *Handler) RefreshToken(ctx *gin.Context) {
 	// Get token from Authorization header
 	authHeader := ctx.GetHeader("Authorization")
 	if authHeader == "" {
-		core.Error(ctx, http.StatusUnauthorized, "Authorization header required")
+		response.Error(ctx, http.StatusUnauthorized, "Authorization header required")
 		return
 	}
 
 	// Extract token from "Bearer <token>" format
 	const bearerPrefix = "Bearer "
 	if len(authHeader) < len(bearerPrefix) || authHeader[:len(bearerPrefix)] != bearerPrefix {
-		core.Error(ctx, http.StatusUnauthorized, "Invalid authorization header format")
+		response.Error(ctx, http.StatusUnauthorized, "Invalid authorization header format")
 		return
 	}
 	oldToken := authHeader[len(bearerPrefix):]
@@ -260,12 +259,12 @@ func (h *Handler) RefreshToken(ctx *gin.Context) {
 	// Refresh the token
 	newToken, err := h.jwtManager.RefreshToken(oldToken)
 	if err != nil {
-		core.Error(ctx, http.StatusUnauthorized, "Failed to refresh token")
+		response.Error(ctx, http.StatusUnauthorized, "Failed to refresh token")
 		return
 	}
 
 	// Return new token
-	core.Success(ctx, http.StatusOK, gin.H{
+	response.Success(ctx, http.StatusOK, gin.H{
 		"access_token": newToken,
 		"token_type":   "Bearer",
 		"expires_in":   86400 * 7, // 7 days in seconds

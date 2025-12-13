@@ -6,11 +6,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	coreauth "hkers-backend/internal/core/auth"
+	response "hkers-backend/internal/core"
 )
 
 // JWTAuth is a middleware that validates JWT tokens from Authorization header
-func JWTAuth(jwtManager *coreauth.JWTManager) gin.HandlerFunc {
+func JWTAuth(jwtManager response.JWTManager) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		// Get Authorization header
 		authHeader := ctx.GetHeader("Authorization")
@@ -91,4 +91,3 @@ func GetUsernameFromContext(ctx *gin.Context) (string, bool) {
 	u, ok := username.(string)
 	return u, ok
 }
-

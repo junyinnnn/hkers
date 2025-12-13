@@ -1,18 +1,16 @@
-package routes
+package user
 
 import (
 	"github.com/gin-gonic/gin"
 
-	"hkers-backend/internal/core"
-	coreauth "hkers-backend/internal/core/auth"
+	response "hkers-backend/internal/core"
 	"hkers-backend/internal/middleware"
-	"hkers-backend/internal/user"
 )
 
 // RegisterUserRoutes registers user routes on the given router.
-func RegisterUserRoutes(router *gin.Engine, svc *core.Container, jwtManager *coreauth.JWTManager) {
+func RegisterUserRoutes(router *gin.Engine, svc *response.Container, jwtManager response.JWTManager) {
 	_ = svc // Will be used when user service is added
-	h := user.NewHandler()
+	h := NewHandler()
 
 	// API routes - require JWT authentication
 	api := router.Group("/api/v1")
