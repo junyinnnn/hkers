@@ -14,6 +14,7 @@ import (
 	"hkers-backend/internal/auth"
 	service "hkers-backend/internal/core/service"
 	"hkers-backend/internal/health"
+	"hkers-backend/internal/middleware"
 	"hkers-backend/internal/user"
 )
 
@@ -22,7 +23,7 @@ func NewRouter(cfg *config.Config, svc *service.Container) (*gin.Engine, error) 
 	router := gin.Default()
 
 	// CORS middleware
-	router.Use(cors.New(cfg.CORS.GetCORSConfig()))
+	router.Use(cors.New(middleware.LoadCORSConfig().GetCORSConfig()))
 
 	// Session middleware using Redis (only for OIDC flow state/verifier)
 	// Not used for authentication after JWT migration
