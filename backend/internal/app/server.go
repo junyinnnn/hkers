@@ -11,10 +11,10 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"hkers-backend/internal/auth"
+	redisconfig "hkers-backend/internal/config/redis"
 	service "hkers-backend/internal/core/service"
 	"hkers-backend/internal/health"
 	"hkers-backend/internal/middleware"
-	redisconfig "hkers-backend/internal/redis"
 	"hkers-backend/internal/user"
 )
 

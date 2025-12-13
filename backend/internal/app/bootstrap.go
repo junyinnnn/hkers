@@ -9,9 +9,9 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"hkers-backend/internal/auth"
+	"hkers-backend/internal/config/database"
+	redisconfig "hkers-backend/internal/config/redis"
 	service "hkers-backend/internal/core/service"
-	"hkers-backend/internal/database"
-	redisconfig "hkers-backend/internal/redis"
 	"hkers-backend/internal/user"
 )
 
