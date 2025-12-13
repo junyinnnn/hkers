@@ -14,7 +14,7 @@ import (
 	"hkers-backend/config"
 	"hkers-backend/internal/app"
 	"hkers-backend/internal/auth"
-	"hkers-backend/internal/core/service"
+	response "hkers-backend/internal/core/service"
 	"hkers-backend/internal/user"
 )
 
@@ -38,23 +38,24 @@ func main() {
 
 	ctx := context.Background()
 	// Initialize database connection pool
-	pool, err := initDB(ctx, cfg)
+	pool, err := initDB(ctx)
 	if err != nil {
 		log.Fatalf("Failed to create database connection pool: %v", err)
 	}
 	defer pool.Close()
 
 	// Initialize Redis client (used by session store)
-	redisClient, err := initRedis(ctx, cfg)
+	redisClient, err := initRedis(ctx)
 	if err != nil {
 		log.Fatalf("Failed to connect to Redis: %v", err)
 	}
 	defer redisClient.Close()
 
 	// Initialize services
+	oidcConfig := auth.LoadOIDCConfig()
 	var authService *auth.Service
-	log.Printf("Initializing OIDC service with issuer: %s", cfg.OIDC.Issuer)
-	authService, err = auth.NewService(&cfg.OIDC)
+	log.Printf("Initializing OIDC service with issuer: %s", oidcConfig.Issuer)
+	authService, err = auth.NewService(&oidcConfig)
 	if err != nil {
 		log.Fatalf("Failed to initialize auth service: %v", err)
 	}
@@ -67,7 +68,7 @@ func main() {
 	svc := response.NewContainer(authService, userService)
 
 	// Setup router
-	router, err := app.NewRouter(cfg, svc)
+	router, err := app.NewRouter(cfg.SessionSecret, svc)
 	if err != nil {
 		log.Fatalf("Failed to set up router: %v", err)
 	}

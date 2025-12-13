@@ -5,17 +5,18 @@ import (
 	"log"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-
 	"github.com/redis/go-redis/v9"
 
-	"hkers-backend/config"
+	"hkers-backend/internal/database"
+	redisconfig "hkers-backend/internal/redis"
 )
 
 // initDB creates and verifies a pgx pool based on configuration.
-func initDB(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
-	log.Printf("Connecting to database at %s:%s", cfg.Database.Host, cfg.Database.Port)
+func initDB(ctx context.Context) (*pgxpool.Pool, error) {
+	dbConfig := database.LoadConfig()
+	log.Printf("Connecting to database at %s:%s", dbConfig.Host, dbConfig.Port)
 
-	pool, err := pgxpool.New(ctx, cfg.Database.GetConnString())
+	pool, err := pgxpool.New(ctx, dbConfig.GetConnString())
 	if err != nil {
 		return nil, err
 	}
@@ -31,13 +32,14 @@ func initDB(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
 }
 
 // initRedis creates a Redis client and verifies connectivity with a PING.
-func initRedis(ctx context.Context, cfg *config.Config) (*redis.Client, error) {
+func initRedis(ctx context.Context) (*redis.Client, error) {
+	redisConfig := redisconfig.LoadConfig()
 	opts := &redis.Options{
-		Addr:     cfg.Redis.GetAddr(),
-		Username: cfg.Redis.Username,
-		Password: cfg.Redis.Password,
-		DB:       cfg.Redis.DB,
-		TLSConfig: cfg.Redis.GetTLSConfig(),
+		Addr:      redisConfig.GetAddr(),
+		Username:  redisConfig.Username,
+		Password:  redisConfig.Password,
+		DB:        redisConfig.DB,
+		TLSConfig: redisConfig.GetTLSConfig(),
 	}
 
 	log.Printf("Connecting to Redis at %s", opts.Addr)

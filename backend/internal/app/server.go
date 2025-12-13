@@ -10,24 +10,27 @@ import (
 	"github.com/gin-contrib/sessions/redis"
 	"github.com/gin-gonic/gin"
 
-	"hkers-backend/config"
 	"hkers-backend/internal/auth"
 	service "hkers-backend/internal/core/service"
 	"hkers-backend/internal/health"
 	"hkers-backend/internal/middleware"
+	redisconfig "hkers-backend/internal/redis"
 	"hkers-backend/internal/user"
 )
 
 // NewRouter configures the Gin engine with middleware and route groups.
-func NewRouter(cfg *config.Config, svc *service.Container) (*gin.Engine, error) {
+func NewRouter(sessionSecret string, svc *service.Container) (*gin.Engine, error) {
 	router := gin.Default()
 
 	// CORS middleware
 	router.Use(cors.New(middleware.LoadCORSConfig().GetCORSConfig()))
 
+	// Load Redis config for session store
+	redisConfig := redisconfig.LoadConfig()
+
 	// Session middleware using Redis (only for OIDC flow state/verifier)
 	// Not used for authentication after JWT migration
-	store, err := redis.NewStoreWithPool(cfg.Redis.NewRedisPool(), []byte(cfg.SessionSecret))
+	store, err := redis.NewStoreWithPool(redisConfig.NewRedisPool(), []byte(sessionSecret))
 	if err != nil {
 		return nil, fmt.Errorf("create Redis session store: %w", err)
 	}
@@ -40,8 +43,11 @@ func NewRouter(cfg *config.Config, svc *service.Container) (*gin.Engine, error) 
 	})
 	router.Use(sessions.Sessions("auth-session", store))
 
+	// Load JWT config
+	jwtConfig := auth.LoadJWTConfig()
+
 	// Create JWT manager for token-based authentication
-	jwtManager := auth.NewJWTManager(cfg.JWT.Secret, cfg.JWT.Duration)
+	jwtManager := auth.NewJWTManager(jwtConfig.Secret, jwtConfig.Duration)
 
 	// Register route groups
 	health.RegisterHealthRoutes(router)

@@ -11,8 +11,6 @@ import (
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
-
-	"hkers-backend/config"
 )
 
 // Service handles authentication logic with a generic OIDC provider.
@@ -23,10 +21,11 @@ type Service struct {
 	clientID      string
 	endSessionURL string
 	postLogoutURL string
+	oidcCfg       OIDCConfig
 }
 
 // NewService creates a new OIDC authentication service instance.
-func NewService(cfg *config.OIDCConfig) (*Service, error) {
+func NewService(cfg *OIDCConfig) (*Service, error) {
 	// Validate required configuration
 	required := []struct {
 		value string
@@ -74,6 +73,7 @@ func NewService(cfg *config.OIDCConfig) (*Service, error) {
 		clientID:      cfg.ClientID,
 		endSessionURL: cfg.EndSessionURL,
 		postLogoutURL: cfg.PostLogoutRedirectURL,
+		oidcCfg:       *cfg,
 	}, nil
 }
 
