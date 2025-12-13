@@ -7,20 +7,21 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 
-	response "hkers-backend/internal/core"
+	"hkers-backend/internal/core/response"
+	service "hkers-backend/internal/core/service"
 	db "hkers-backend/internal/db/generated"
 	"hkers-backend/internal/user"
 )
 
 // Handler handles authentication-related HTTP requests.
 type Handler struct {
-	authService response.AuthService
-	userService response.UserService
+	authService service.AuthServiceInterface
+	userService service.UserServiceInterface
 	jwtManager  response.JWTManager
 }
 
 // NewHandler creates a new auth Handler instance.
-func NewHandler(authService response.AuthService, userService response.UserService, jwtManager response.JWTManager) *Handler {
+func NewHandler(authService service.AuthServiceInterface, userService service.UserServiceInterface, jwtManager response.JWTManager) *Handler {
 	return &Handler{
 		authService: authService,
 		userService: userService,

@@ -14,7 +14,7 @@ import (
 	"hkers-backend/config"
 	"hkers-backend/internal/app"
 	"hkers-backend/internal/auth"
-	response "hkers-backend/internal/core"
+	"hkers-backend/internal/core/service"
 	"hkers-backend/internal/user"
 )
 

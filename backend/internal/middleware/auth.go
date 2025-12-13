@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	response "hkers-backend/internal/core"
+	"hkers-backend/internal/core/response"
 )
 
 // JWTAuth is a middleware that validates JWT tokens from Authorization header

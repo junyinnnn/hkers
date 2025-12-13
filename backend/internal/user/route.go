@@ -3,12 +3,13 @@ package user
 import (
 	"github.com/gin-gonic/gin"
 
-	response "hkers-backend/internal/core"
+	"hkers-backend/internal/core/response"
+	service "hkers-backend/internal/core/service"
 	"hkers-backend/internal/middleware"
 )
 
 // RegisterUserRoutes registers user routes on the given router.
-func RegisterUserRoutes(router *gin.Engine, svc *response.Container, jwtManager response.JWTManager) {
+func RegisterUserRoutes(router *gin.Engine, svc *service.Container, jwtManager response.JWTManager) {
 	_ = svc // Will be used when user service is added
 	h := NewHandler()
 

@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	response "hkers-backend/internal/core"
+	"hkers-backend/internal/core/response"
 	"hkers-backend/internal/middleware"
 )
 

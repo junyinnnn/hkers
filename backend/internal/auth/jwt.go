@@ -7,7 +7,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	response "hkers-backend/internal/core"
+	"hkers-backend/internal/core/response"
 )
 
 var (

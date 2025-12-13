@@ -9,8 +9,8 @@ import (
 	db "hkers-backend/internal/db/generated"
 )
 
-// AuthService defines the interface for authentication services
-type AuthService interface {
+// AuthServiceInterface defines the interface for authentication services
+type AuthServiceInterface interface {
 	GenerateState() (string, error)
 	GeneratePKCE() (string, string, error)
 	GetAuthURLWithPKCE(state, codeChallenge string) string
@@ -21,8 +21,8 @@ type AuthService interface {
 	GetEndSessionURL(returnTo, idToken string) (string, bool, error)
 }
 
-// UserService defines the interface for user services
-type UserService interface {
+// UserServiceInterface defines the interface for user services
+type UserServiceInterface interface {
 	ValidateOIDCLogin(ctx context.Context, oidcSub string) (*db.User, error)
 	GetOrCreateOIDCUser(ctx context.Context, oidcSub, nickname, email string) (*db.User, bool, error)
 }
@@ -30,14 +30,14 @@ type UserService interface {
 // Container holds all application services.
 // Pass this to handlers instead of individual services.
 type Container struct {
-	Auth AuthService
-	User UserService
+	Auth AuthServiceInterface
+	User UserServiceInterface
 	// Add more services as needed:
 	// Email *EmailService
 }
 
 // NewContainer creates a new service container.
-func NewContainer(authSvc AuthService, userSvc UserService) *Container {
+func NewContainer(authSvc AuthServiceInterface, userSvc UserServiceInterface) *Container {
 	return &Container{
 		Auth: authSvc,
 		User: userSvc,
