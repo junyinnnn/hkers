@@ -3,7 +3,6 @@ package app
 import (
 	"fmt"
 	"net/http"
-	"os"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
@@ -11,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"hkers-backend/internal/auth"
+	"hkers-backend/internal/config"
 	redisconfig "hkers-backend/internal/config/redis"
 	service "hkers-backend/internal/core/service"
 	"hkers-backend/internal/health"
@@ -19,18 +19,15 @@ import (
 )
 
 // NewRouter configures the Gin engine with middleware and route groups.
-func NewRouter(sessionSecret string, svc *service.Container) (*gin.Engine, error) {
+func NewRouter(cfg *config.Config, svc *service.Container) (*gin.Engine, error) {
 	router := gin.Default()
 
 	// CORS middleware
-	router.Use(cors.New(middleware.LoadCORSConfig().GetCORSConfig()))
-
-	// Load Redis config for session store
-	redisConfig := redisconfig.LoadConfig()
+	router.Use(cors.New(middleware.GetCORSConfig(&cfg.CORS)))
 
 	// Session middleware using Redis (only for OIDC flow state/verifier)
 	// Not used for authentication after JWT migration
-	store, err := redis.NewStoreWithPool(redisConfig.NewRedisPool(), []byte(sessionSecret))
+	store, err := redis.NewStoreWithPool(redisconfig.NewRedisPool(&cfg.Redis), []byte(cfg.Server.SessionSecret))
 	if err != nil {
 		return nil, fmt.Errorf("create Redis session store: %w", err)
 	}
@@ -38,16 +35,13 @@ func NewRouter(sessionSecret string, svc *service.Container) (*gin.Engine, error
 		Path:     "/",
 		MaxAge:   3600, // 1 hour - only needed during OIDC flow
 		HttpOnly: true,
-		Secure:   os.Getenv("GIN_MODE") == "release", // Secure cookies in production
+		Secure:   cfg.Server.GinMode == "release", // Secure cookies in production
 		SameSite: http.SameSiteLaxMode,
 	})
 	router.Use(sessions.Sessions("auth-session", store))
 
-	// Load JWT config
-	jwtConfig := auth.LoadJWTConfig()
-
 	// Create JWT manager for token-based authentication
-	jwtManager := auth.NewJWTManager(jwtConfig.Secret, jwtConfig.Duration)
+	jwtManager := auth.NewJWTManager(cfg.Auth.JWT.Secret, cfg.Auth.JWT.Duration)
 
 	// Register route groups
 	health.RegisterHealthRoutes(router)

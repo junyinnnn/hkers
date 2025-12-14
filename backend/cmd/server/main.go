@@ -6,11 +6,11 @@ import (
 	"encoding/gob"
 	"log"
 	"net/http"
-	"os"
 
 	"github.com/gin-gonic/gin"
 
 	"hkers-backend/internal/app"
+	"hkers-backend/internal/config"
 )
 
 func init() {
@@ -20,19 +20,19 @@ func init() {
 }
 
 func main() {
-	// Set Gin mode from environment
-	if mode := os.Getenv("GIN_MODE"); mode != "" {
-		gin.SetMode(mode)
-	}
-
 	// Load configuration
-	cfg, err := Load()
+	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
+	// Set Gin mode from configuration
+	if cfg.Server.GinMode != "" {
+		gin.SetMode(cfg.Server.GinMode)
+	}
+
 	// Bootstrap all application components
-	bootstrap, err := app.Bootstrap(cfg.SessionSecret)
+	bootstrap, err := app.Bootstrap(cfg)
 	if err != nil {
 		log.Fatalf("Failed to bootstrap application: %v", err)
 	}

@@ -9,7 +9,8 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"hkers-backend/internal/auth"
-	"hkers-backend/internal/config/database"
+	"hkers-backend/internal/config"
+	databaseconfig "hkers-backend/internal/config/database"
 	redisconfig "hkers-backend/internal/config/redis"
 	service "hkers-backend/internal/core/service"
 	"hkers-backend/internal/user"
@@ -24,34 +25,37 @@ type BootstrapResult struct {
 }
 
 // Bootstrap initializes all application components
-func Bootstrap(sessionSecret string) (*BootstrapResult, error) {
+func Bootstrap(cfg *config.Config) (*BootstrapResult, error) {
 
 	ctx := context.Background()
 
 	// Initialize database connection pool
-	pool, err := database.InitDB(ctx)
+	pool, err := databaseconfig.InitDB(ctx, &cfg.Database)
 	if err != nil {
 		return nil, err
 	}
 
 	// Initialize Redis client (used by session store)
-	redisClient, err := redisconfig.InitRedis(ctx)
+	redisClient, err := redisconfig.InitRedis(ctx, &cfg.Redis)
 	if err != nil {
 		pool.Close()
 		return nil, err
 	}
 
 	// Initialize services
-	oidcConfig := auth.LoadOIDCConfig()
 	var authService *auth.Service
-	log.Printf("Initializing OIDC service with issuer: %s", oidcConfig.Issuer)
-	authService, err = auth.NewService(&oidcConfig)
-	if err != nil {
-		pool.Close()
-		redisClient.Close()
-		return nil, err
+	if cfg.Auth.OIDC.Issuer != "" {
+		log.Printf("Initializing OIDC service with issuer: %s", cfg.Auth.OIDC.Issuer)
+		authService, err = auth.NewService(&cfg.Auth.OIDC)
+		if err != nil {
+			pool.Close()
+			redisClient.Close()
+			return nil, err
+		}
+		log.Printf("OIDC service initialized successfully")
+	} else {
+		log.Printf("OIDC not configured, skipping OIDC service initialization")
 	}
-	log.Printf("OIDC service initialized successfully")
 
 	// Initialize user service
 	userService := user.NewService(pool)
@@ -60,7 +64,7 @@ func Bootstrap(sessionSecret string) (*BootstrapResult, error) {
 	svc := service.NewContainer(authService, userService)
 
 	// Setup router
-	router, err := NewRouter(sessionSecret, svc)
+	router, err := NewRouter(cfg, svc)
 	if err != nil {
 		pool.Close()
 		redisClient.Close()
