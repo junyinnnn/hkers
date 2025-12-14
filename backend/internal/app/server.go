@@ -12,14 +12,13 @@ import (
 	"hkers-backend/internal/auth"
 	"hkers-backend/internal/config"
 	redisconfig "hkers-backend/internal/config/redis"
-	service "hkers-backend/internal/core/service"
 	"hkers-backend/internal/health"
 	"hkers-backend/internal/middleware"
 	"hkers-backend/internal/user"
 )
 
 // NewRouter configures the Gin engine with middleware and route groups.
-func NewRouter(cfg *config.Config, svc *service.Container) (*gin.Engine, error) {
+func NewRouter(cfg *config.Config, authSvc auth.ServiceInterface, userSvc user.ServiceInterface) (*gin.Engine, error) {
 	router := gin.Default()
 
 	// CORS middleware
@@ -45,8 +44,8 @@ func NewRouter(cfg *config.Config, svc *service.Container) (*gin.Engine, error) 
 
 	// Register route groups
 	health.RegisterHealthRoutes(router)
-	auth.RegisterAuthRoutes(router, svc, jwtManager)
-	user.RegisterUserRoutes(router, svc, jwtManager)
+	auth.RegisterAuthRoutes(router, authSvc, userSvc, jwtManager)
+	user.RegisterUserRoutes(router, jwtManager)
 
 	return router, nil
 }

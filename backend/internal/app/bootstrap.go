@@ -12,16 +12,16 @@ import (
 	"hkers-backend/internal/config"
 	databaseconfig "hkers-backend/internal/config/database"
 	redisconfig "hkers-backend/internal/config/redis"
-	service "hkers-backend/internal/core/service"
 	"hkers-backend/internal/user"
 )
 
 // BootstrapResult contains all initialized components needed to run the server
 type BootstrapResult struct {
-	Database *pgxpool.Pool
-	Redis    *redis.Client
-	Service  *service.Container
-	Router   *gin.Engine
+	Database    *pgxpool.Pool
+	Redis       *redis.Client
+	AuthService auth.ServiceInterface
+	UserService user.ServiceInterface
+	Router      *gin.Engine
 }
 
 // Bootstrap initializes all application components
@@ -43,7 +43,7 @@ func Bootstrap(cfg *config.Config) (*BootstrapResult, error) {
 	}
 
 	// Initialize services
-	var authService *auth.Service
+	var authService auth.ServiceInterface
 	if cfg.Auth.OIDC.Issuer != "" {
 		log.Printf("Initializing OIDC service with issuer: %s", cfg.Auth.OIDC.Issuer)
 		authService, err = auth.NewService(&cfg.Auth.OIDC)
@@ -60,11 +60,8 @@ func Bootstrap(cfg *config.Config) (*BootstrapResult, error) {
 	// Initialize user service
 	userService := user.NewService(pool)
 
-	// Create service container
-	svc := service.NewContainer(authService, userService)
-
 	// Setup router
-	router, err := NewRouter(cfg, svc)
+	router, err := NewRouter(cfg, authService, userService)
 	if err != nil {
 		pool.Close()
 		redisClient.Close()
@@ -72,9 +69,10 @@ func Bootstrap(cfg *config.Config) (*BootstrapResult, error) {
 	}
 
 	return &BootstrapResult{
-		Database: pool,
-		Redis:    redisClient,
-		Service:  svc,
-		Router:   router,
+		Database:    pool,
+		Redis:       redisClient,
+		AuthService: authService,
+		UserService: userService,
+		Router:      router,
 	}, nil
 }

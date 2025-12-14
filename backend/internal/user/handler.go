@@ -6,7 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"hkers-backend/internal/core/response"
-	"hkers-backend/internal/core/service"
 	"hkers-backend/internal/middleware"
 )
 
@@ -17,7 +16,7 @@ type Handler struct {
 }
 
 // NewHandler creates a new user Handler instance.
-func NewHandler() service.UserHandlerInterface {
+func NewHandler() HandlerInterface {
 	return &Handler{}
 }
 
