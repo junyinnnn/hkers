@@ -5,8 +5,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"hkers-backend/internal/http/middleware"
-	"hkers-backend/internal/http/response"
+	"hkers-backend/internal/core/response"
+	"hkers-backend/internal/middleware"
 )
 
 // Handler handles user-related HTTP requests.
@@ -16,7 +16,7 @@ type Handler struct {
 }
 
 // NewHandler creates a new user Handler instance.
-func NewHandler() *Handler {
+func NewHandler() HandlerInterface {
 	return &Handler{}
 }
 

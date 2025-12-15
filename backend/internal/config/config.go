@@ -1,35 +1,30 @@
-// config/config.go
-
 package config
 
 import (
-	"crypto/tls"
 	"log"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/gin-contrib/cors"
-	redigo "github.com/gomodule/redigo/redis"
 	"github.com/joho/godotenv"
 )
 
 // Config holds all configuration for the application.
 type Config struct {
-	Server        ServerConfig
-	Database      DatabaseConfig
-	Redis         RedisConfig
-	OIDC          OIDCConfig
-	CORS          CORSConfig
-	JWT           JWTConfig
-	SessionSecret string
+	Server   ServerConfig
+	Database DatabaseConfig
+	Redis    RedisConfig
+	Auth     AuthConfig
+	CORS     CORSConfig
 }
 
-// JWTConfig holds JWT token configuration.
-type JWTConfig struct {
-	Secret   string
-	Duration time.Duration
+// ServerConfig holds server-related configuration.
+type ServerConfig struct {
+	Host          string
+	Port          string
+	SessionSecret string
+	GinMode       string
 }
 
 // DatabaseConfig holds database connection configuration.
@@ -75,50 +70,16 @@ func (r *RedisConfig) GetAddr() string {
 	return r.Host + ":" + r.Port
 }
 
-// GetTLSConfig returns a TLS configuration when TLS is enabled, otherwise nil.
-func (r *RedisConfig) GetTLSConfig() *tls.Config {
-	if !r.TLSEnabled {
-		return nil
-	}
-
-	return &tls.Config{
-		InsecureSkipVerify: r.TLSInsecureSkipVerify,
-	}
+// AuthConfig holds authentication-related configuration.
+type AuthConfig struct {
+	JWT  JWTConfig
+	OIDC OIDCConfig
 }
 
-// NewRedisPool creates a redigo connection pool with TLS support if enabled.
-func (r *RedisConfig) NewRedisPool() *redigo.Pool {
-	return &redigo.Pool{
-		MaxIdle:     10,
-		IdleTimeout: 240 * time.Second,
-		Dial: func() (redigo.Conn, error) {
-			opts := []redigo.DialOption{
-				redigo.DialPassword(r.Password),
-			}
-
-			if r.TLSEnabled {
-				opts = append(opts,
-					redigo.DialTLSConfig(r.GetTLSConfig()),
-					redigo.DialUseTLS(true),
-				)
-			}
-
-			return redigo.Dial("tcp", r.GetAddr(), opts...)
-		},
-		TestOnBorrow: func(c redigo.Conn, t time.Time) error {
-			if time.Since(t) < time.Minute {
-				return nil
-			}
-			_, err := c.Do("PING")
-			return err
-		},
-	}
-}
-
-// ServerConfig holds server-related configuration.
-type ServerConfig struct {
-	Host string
-	Port string
+// JWTConfig holds JWT token configuration.
+type JWTConfig struct {
+	Secret   string
+	Duration time.Duration
 }
 
 // OIDCConfig holds OpenID Connect configuration.
@@ -157,33 +118,37 @@ func Load() (*Config, error) {
 		}
 	}
 
-	sessionSecret := os.Getenv("SESSION_SECRET")
+	cfg := &Config{
+		Server:   loadServerConfig(),
+		Database: loadDatabaseConfig(),
+		Redis:    loadRedisConfig(),
+		Auth:     loadAuthConfig(),
+		CORS:     loadCORSConfig(),
+	}
+
+	return cfg, nil
+}
+
+// loadServerConfig loads server configuration from environment variables.
+func loadServerConfig() ServerConfig {
+	sessionSecret := getEnv("SESSION_SECRET", "")
 	if sessionSecret == "" {
 		// Generate a warning but don't fail - useful for development
 		log.Printf("WARNING: SESSION_SECRET not set, using default (INSECURE for production)")
 		sessionSecret = "default-insecure-secret-change-in-production"
 	}
 
-	oidcIssuer := os.Getenv("OIDC_ISSUER")
-	oidcClientID := os.Getenv("OIDC_CLIENT_ID")
-	oidcClientSecret := os.Getenv("OIDC_CLIENT_SECRET")
-	oidcRedirectURL := os.Getenv("OIDC_REDIRECT_URL")
-	oidcScopes := strings.TrimSpace(os.Getenv("OIDC_SCOPES"))
-	if oidcScopes == "" {
-		oidcScopes = "openid,profile,email"
+	return ServerConfig{
+		Host:          getEnv("SERVER_HOST", "0.0.0.0"), // 0.0.0.0 allows access from outside container
+		Port:          getEnv("SERVER_PORT", "3000"),
+		SessionSecret: sessionSecret,
+		GinMode:       getEnv("GIN_MODE", ""),
 	}
-	rawScopes := strings.Split(oidcScopes, ",")
-	for i := range rawScopes {
-		rawScopes[i] = strings.TrimSpace(rawScopes[i])
-	}
-	endSessionURL := strings.TrimSpace(os.Getenv("OIDC_END_SESSION_URL"))
-	postLogoutRedirect := strings.TrimSpace(os.Getenv("OIDC_POST_LOGOUT_REDIRECT_URL"))
+}
 
-	// CORS configuration
-	corsConfig := loadCORSConfig()
-
-	// Database configuration
-	dbConfig := DatabaseConfig{
+// loadDatabaseConfig loads database configuration from environment variables.
+func loadDatabaseConfig() DatabaseConfig {
+	return DatabaseConfig{
 		Host:     getEnv("POSTGRES_HOST", "localhost"),
 		Port:     getEnv("POSTGRES_PORT", "5432"),
 		User:     getEnv("POSTGRES_USER", "pguser"),
@@ -191,12 +156,15 @@ func Load() (*Config, error) {
 		Name:     getEnv("POSTGRES_DB", "pgdb"),
 		SSLMode:  getEnv("POSTGRES_SSLMODE", "disable"),
 	}
+}
 
-	// Redis configuration
+// loadRedisConfig loads Redis configuration from environment variables.
+func loadRedisConfig() RedisConfig {
 	redisDB, _ := strconv.Atoi(getEnv("REDIS_DB", "0"))
-	redisTLSEnabled := strings.EqualFold(getEnv("REDIS_TLS_ENABLED", "false"), "true")
-	redisTLSInsecureSkipVerify := strings.EqualFold(getEnv("REDIS_TLS_INSECURE_SKIP_VERIFY", "false"), "true")
-	redisConfig := RedisConfig{
+	redisTLSEnabled := getEnv("REDIS_TLS_ENABLED", "false") == "true"
+	redisTLSInsecureSkipVerify := getEnv("REDIS_TLS_INSECURE_SKIP_VERIFY", "false") == "true"
+
+	return RedisConfig{
 		Host:                  getEnv("REDIS_HOST", "localhost"),
 		Port:                  getEnv("REDIS_PORT", "6379"),
 		Username:              getEnv("REDIS_USERNAME", ""),
@@ -205,39 +173,43 @@ func Load() (*Config, error) {
 		TLSEnabled:            redisTLSEnabled,
 		TLSInsecureSkipVerify: redisTLSInsecureSkipVerify,
 	}
+}
 
-	// JWT configuration
-	jwtSecret := getEnv("JWT_SECRET", sessionSecret) // Use session secret as fallback
+// loadAuthConfig loads authentication configuration from environment variables.
+func loadAuthConfig() AuthConfig {
+	// JWT Config
+	jwtSecret := getEnv("JWT_SECRET", "")
 	jwtDurationStr := getEnv("JWT_DURATION", "168h") // Default 7 days
 	jwtDuration, err := time.ParseDuration(jwtDurationStr)
 	if err != nil {
-		log.Printf("WARNING: Invalid JWT_DURATION '%s', using default 7 days", jwtDurationStr)
-		jwtDuration = 7 * 24 * time.Hour
+		jwtDuration = 7 * 24 * time.Hour // fallback to 7 days
 	}
 
-	return &Config{
-		Server: ServerConfig{
-			Host: getEnv("SERVER_HOST", "0.0.0.0"), // 0.0.0.0 allows access from outside container
-			Port: getEnv("SERVER_PORT", "3000"),
-		},
-		Database: dbConfig,
-		Redis:    redisConfig,
-		OIDC: OIDCConfig{
-			Issuer:                oidcIssuer,
-			ClientID:              oidcClientID,
-			ClientSecret:          oidcClientSecret,
-			RedirectURL:           oidcRedirectURL,
-			Scopes:                rawScopes,
-			EndSessionURL:         endSessionURL,
-			PostLogoutRedirectURL: postLogoutRedirect,
-		},
-		CORS: corsConfig,
+	// OIDC Config
+	oidcScopes := strings.TrimSpace(getEnv("OIDC_SCOPES", ""))
+	if oidcScopes == "" {
+		oidcScopes = "openid,profile,email"
+	}
+	rawScopes := strings.Split(oidcScopes, ",")
+	for i := range rawScopes {
+		rawScopes[i] = strings.TrimSpace(rawScopes[i])
+	}
+
+	return AuthConfig{
 		JWT: JWTConfig{
 			Secret:   jwtSecret,
 			Duration: jwtDuration,
 		},
-		SessionSecret: sessionSecret,
-	}, nil
+		OIDC: OIDCConfig{
+			Issuer:                strings.TrimSpace(getEnv("OIDC_ISSUER", "")),
+			ClientID:              strings.TrimSpace(getEnv("OIDC_CLIENT_ID", "")),
+			ClientSecret:          strings.TrimSpace(getEnv("OIDC_CLIENT_SECRET", "")),
+			RedirectURL:           strings.TrimSpace(getEnv("OIDC_REDIRECT_URL", "")),
+			Scopes:                rawScopes,
+			EndSessionURL:         strings.TrimSpace(getEnv("OIDC_END_SESSION_URL", "")),
+			PostLogoutRedirectURL: strings.TrimSpace(getEnv("OIDC_POST_LOGOUT_REDIRECT_URL", "")),
+		},
+	}
 }
 
 // loadCORSConfig loads CORS configuration from environment variables.
@@ -297,32 +269,6 @@ func loadCORSConfig() CORSConfig {
 		AllowCredentials: allowCredentials,
 		MaxAge:           maxAge,
 	}
-}
-
-// GetCORSConfig returns the gin-contrib/cors Config based on the CORSConfig.
-func (c *CORSConfig) GetCORSConfig() cors.Config {
-	config := cors.Config{
-		AllowMethods:     c.AllowMethods,
-		AllowHeaders:     c.AllowHeaders,
-		ExposeHeaders:    c.ExposeHeaders,
-		AllowCredentials: c.AllowCredentials,
-		MaxAge:           time.Duration(c.MaxAge) * time.Second,
-	}
-
-	if c.AllowAllOrigins {
-		config.AllowOriginFunc = func(origin string) bool {
-			return true
-		}
-	} else if len(c.AllowOrigins) > 0 {
-		config.AllowOrigins = c.AllowOrigins
-	} else {
-		// Default: allow all if nothing specified
-		config.AllowOriginFunc = func(origin string) bool {
-			return true
-		}
-	}
-
-	return config
 }
 
 // getEnv returns the value of an environment variable or a default value.

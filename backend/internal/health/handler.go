@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"hkers-backend/internal/http/response"
+	"hkers-backend/internal/core/response"
 )
 
 // Handler returns the health status of the API.

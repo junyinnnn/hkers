@@ -7,21 +7,20 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 
-	coreauth "hkers-backend/internal/core/auth"
-	coreuser "hkers-backend/internal/core/user"
-	db "hkers-backend/internal/db/generated"
-	"hkers-backend/internal/http/response"
+	"hkers-backend/internal/core/response"
+	db "hkers-backend/internal/sqlc/generated"
+	"hkers-backend/internal/user"
 )
 
 // Handler handles authentication-related HTTP requests.
 type Handler struct {
-	authService *coreauth.Service
-	userService *coreuser.Service
-	jwtManager  *coreauth.JWTManager
+	authService ServiceInterface
+	userService user.ServiceInterface
+	jwtManager  response.JWTManager
 }
 
 // NewHandler creates a new auth Handler instance.
-func NewHandler(authService *coreauth.Service, userService *coreuser.Service, jwtManager *coreauth.JWTManager) *Handler {
+func NewHandler(authService ServiceInterface, userService user.ServiceInterface, jwtManager response.JWTManager) HandlerInterface {
 	return &Handler{
 		authService: authService,
 		userService: userService,
@@ -113,17 +112,17 @@ func (h *Handler) Callback(ctx *gin.Context) {
 	}
 
 	// Check if user is allowed to login (must exist in database and be active)
-	var user *db.User
+	var dbUser *db.User
 	if h.userService != nil {
 		var validateErr error
-		user, validateErr = h.userService.ValidateOIDCLogin(ctx.Request.Context(), oidcSub)
+		dbUser, validateErr = h.userService.ValidateOIDCLogin(ctx.Request.Context(), oidcSub)
 		if validateErr != nil {
-			if errors.Is(validateErr, coreuser.ErrUserNotActive) {
+			if errors.Is(validateErr, user.ErrUserNotActive) {
 				// User exists but is not activated - pending approval
 				response.Error(ctx, http.StatusForbidden, "Your account is pending approval. Please contact an administrator.")
 				return
 			}
-			if errors.Is(validateErr, coreuser.ErrUserNotAllowed) {
+			if errors.Is(validateErr, user.ErrUserNotAllowed) {
 				// User doesn't exist in our system
 				// Option 1: Auto-create as inactive (requires admin approval)
 				email, _ := profile["email"].(string)
@@ -159,11 +158,11 @@ func (h *Handler) Callback(ctx *gin.Context) {
 
 	// Generate JWT token for the authenticated user
 	jwtToken, jwtErr := h.jwtManager.GenerateToken(
-		user.ID,
-		user.Email.String,
-		user.OidcSub,
-		user.Username,
-		user.IsActive.Bool,
+		dbUser.ID,
+		dbUser.Email.String,
+		dbUser.OidcSub,
+		dbUser.Username,
+		dbUser.IsActive.Bool,
 	)
 	if jwtErr != nil {
 		response.Error(ctx, http.StatusInternalServerError, "Failed to generate access token")
@@ -184,13 +183,13 @@ func (h *Handler) Callback(ctx *gin.Context) {
 		"token_type":   "Bearer",
 		"expires_in":   86400 * 7, // 7 days in seconds
 		"user": gin.H{
-			"id":           user.ID,
-			"email":        user.Email.String,
-			"username":     user.Username,
-			"oidc_sub":     user.OidcSub,
-			"is_active":    user.IsActive,
-			"trust_points": user.TrustPoints,
-			"created_at":   user.CreatedAt,
+			"id":           dbUser.ID,
+			"email":        dbUser.Email.String,
+			"username":     dbUser.Username,
+			"oidc_sub":     dbUser.OidcSub,
+			"is_active":    dbUser.IsActive,
+			"trust_points": dbUser.TrustPoints,
+			"created_at":   dbUser.CreatedAt,
 		},
 	})
 }

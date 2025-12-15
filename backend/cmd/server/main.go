@@ -3,18 +3,14 @@
 package main
 
 import (
-	"context"
 	"encoding/gob"
 	"log"
 	"net/http"
-	"os"
 
 	"github.com/gin-gonic/gin"
 
-	"hkers-backend/config"
 	"hkers-backend/internal/app"
-	"hkers-backend/internal/core"
-	coreauth "hkers-backend/internal/core/auth"
+	"hkers-backend/internal/config"
 )
 
 func init() {
@@ -24,54 +20,29 @@ func init() {
 }
 
 func main() {
-	// Set Gin mode from environment
-	if mode := os.Getenv("GIN_MODE"); mode != "" {
-		gin.SetMode(mode)
-	}
-
 	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
-	ctx := context.Background()
-	// Initialize database connection pool
-	pool, err := initDB(ctx, cfg)
-	if err != nil {
-		log.Fatalf("Failed to create database connection pool: %v", err)
+	// Set Gin mode from configuration
+	if cfg.Server.GinMode != "" {
+		gin.SetMode(cfg.Server.GinMode)
 	}
-	defer pool.Close()
 
-	// Initialize Redis client (used by session store)
-	redisClient, err := initRedis(ctx, cfg)
+	// Bootstrap all application components
+	bootstrap, err := app.Bootstrap(cfg)
 	if err != nil {
-		log.Fatalf("Failed to connect to Redis: %v", err)
+		log.Fatalf("Failed to bootstrap application: %v", err)
 	}
-	defer redisClient.Close()
-
-	// Initialize services
-	var authService *coreauth.Service
-	log.Printf("Initializing OIDC service with issuer: %s", cfg.OIDC.Issuer)
-	authService, err = coreauth.NewService(&cfg.OIDC)
-	if err != nil {
-		log.Fatalf("Failed to initialize auth service: %v", err)
-	}
-	log.Printf("OIDC service initialized successfully")
-
-	// Create service container with database pool
-	svc := core.NewContainer(authService, pool)
-
-	// Setup router
-	router, err := app.NewRouter(cfg, svc)
-	if err != nil {
-		log.Fatalf("Failed to set up router: %v", err)
-	}
+	defer bootstrap.Database.Close()
+	defer bootstrap.Redis.Close()
 
 	// Start server
 	addr := cfg.Server.Host + ":" + cfg.Server.Port
 	log.Printf("Server listening on http://%s/", addr)
-	if err := http.ListenAndServe(addr, router); err != nil {
+	if err := http.ListenAndServe(addr, bootstrap.Router); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }
